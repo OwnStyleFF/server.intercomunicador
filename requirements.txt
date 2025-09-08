@@ -1,0 +1,4 @@
+# Archivo de dependencias para el bot de Telegram
+# python-telegram-bot
+# requests
+# etc.
