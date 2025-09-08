@@ -1,4 +1,3 @@
-
 # bot_gateway_full.py
 # Bot de Telegram + backend REST (usuarios, grupos, mensajes, registro, login, etc.)
 
@@ -175,7 +174,13 @@ def get_messages():
         c.execute('SELECT sender_id, message, timestamp FROM messages WHERE recipient_id=? AND is_group=1 ORDER BY timestamp ASC', (group_id,))
     else:
         c.execute('SELECT sender_id, message, timestamp FROM messages WHERE recipient_id=? AND is_group=0 ORDER BY timestamp ASC', (user_id,))
-    messages = [{'sender_id': row[0], 'message': row[1], 'timestamp': row[2]} for row in c.fetchall()]
+    messages = []
+    for row in c.fetchall():
+        sender_id = row[0]
+        c.execute('SELECT username FROM users WHERE id=?', (sender_id,))
+        sender_name = c.fetchone()
+        sender_name = sender_name[0] if sender_name else ''
+        messages.append({'sender_id': sender_id, 'sender_name': sender_name, 'message': row[1], 'timestamp': row[2]})
     conn.close()
     return jsonify({'messages': messages})
 
@@ -223,5 +228,78 @@ def relay():
     else:
         return jsonify({'status': 'error', 'detail': 'chat_id requerido'}), 400
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
+# Endpoint para iniciar llamada
+@app.route('/start_call', methods=['POST'])
+def start_call():
+    data = request.json
+    caller_id = data.get('caller_id')
+    recipient_id = data.get('recipient_id')
+    if not caller_id or not recipient_id:
+        abort(400, 'caller_id y recipient_id requeridos')
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT telegram_id FROM users WHERE id=?', (recipient_id,))
+    tid = c.fetchone()
+    conn.close()
+    if tid and tid[0]:
+        bot.send_message(chat_id=tid[0], text=f'Tienes una llamada entrante de usuario {caller_id}')
+        return jsonify({'status': 'llamada iniciada'})
+    else:
+        return jsonify({'error': 'El usuario receptor no tiene Telegram vinculado'})
+
+# Endpoint para contestar llamada
+@app.route('/answer_call', methods=['POST'])
+def answer_call():
+    data = request.json
+    recipient_id = data.get('recipient_id')
+    caller_id = data.get('caller_id')
+    if not recipient_id or not caller_id:
+        abort(400, 'recipient_id y caller_id requeridos')
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT telegram_id FROM users WHERE id=?', (caller_id,))
+    tid = c.fetchone()
+    conn.close()
+    if tid and tid[0]:
+        bot.send_message(chat_id=tid[0], text=f'El usuario {recipient_id} ha contestado tu llamada')
+        return jsonify({'status': 'llamada contestada'})
+    else:
+        return jsonify({'error': 'El usuario llamante no tiene Telegram vinculado'})
+
+# Endpoint para borrar mensaje, audio o ubicación para ambos usuarios
+@app.route('/delete_message', methods=['POST'])
+def delete_message():
+    data = request.json
+    mensaje_id = data.get('mensaje_id')
+    emisor_id = data.get('emisor_id')
+    receptor_id = data.get('receptor_id')
+    is_audio = data.get('is_audio', False)
+    is_ubicacion = data.get('is_ubicacion', False)
+    if not mensaje_id or not emisor_id or not receptor_id:
+        abort(400, 'Faltan datos para borrar mensaje')
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('DELETE FROM messages WHERE id=? AND (sender_id=? OR recipient_id=?)', (mensaje_id, emisor_id, receptor_id))
+    # Si es audio o ubicación, elimina de la tabla correspondiente si existe
+    # (Agrega lógica si tienes tablas separadas para audios/ubicaciones)
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'mensaje eliminado para ambos'})
+
+# Endpoint para buscar usuario por UUID
+@app.route('/find_user_by_uuid', methods=['POST'])
+def find_user_by_uuid():
+    data = request.json
+    uuid = data.get('uuid')
+    if not uuid:
+        abort(400, 'UUID requerido')
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT id, username FROM users WHERE username=? OR telegram_id=?', (uuid, uuid))
+    user = c.fetchone()
+    conn.close()
+    if user:
+        return jsonify({'exists': True, 'nombre': user[1]})
+    else:
+        return jsonify({'exists': False})
+
