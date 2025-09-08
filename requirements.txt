@@ -1,4 +1,7 @@
-# Archivo de dependencias para el bot de Telegram
-# python-telegram-bot
-# requests
-# etc.
+# Requirements for the Telegram bot project
+flask
+flask-cors
+python-telegram-bot
+requests
+sqlite3
+
