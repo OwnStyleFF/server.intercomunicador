@@ -1,8 +1,13 @@
 
-# ...existing code...
+# bot_gateway_full.py
+# Bot de Telegram + backend REST (usuarios, grupos, mensajes, registro, login, etc.)
 
-
-# ...existing code...
+import os
+from flask import Flask, request, jsonify, abort
+from telegram import Bot
+import requests
+import sqlite3
+from flask_cors import CORS
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '8328266176:AAHwCQTSxbLHCgN2N57fw02p4wKlbHUE_7Q')
 DB_PATH = os.path.join(os.path.dirname(__file__), 'gateway.db')
@@ -17,21 +22,6 @@ def get_server_ip():
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     # Si está detrás de proxy, X-Forwarded-For puede tener la IP pública
     return jsonify({'server_ip': ip})
-# bot_gateway_full.py
-# Bot de Telegram + backend REST (usuarios, grupos, mensajes, registro, login, etc.)
-
-from flask import Flask, request, jsonify, abort
-from telegram import Bot
-import requests
-import os
-import sqlite3
-from flask_cors import CORS
-
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '8328266176:AAHwCQTSxbLHCgN2N57fw02p4wKlbHUE_7Q')
-DB_PATH = os.path.join(os.path.dirname(__file__), 'gateway.db')
-app = Flask(__name__)
-CORS(app)
-bot = Bot(token=TELEGRAM_TOKEN)
 
 # Inicializar base de datos
 
