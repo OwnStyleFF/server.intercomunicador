@@ -3,5 +3,3 @@ flask
 flask-cors
 python-telegram-bot
 requests
-sqlite3
-
