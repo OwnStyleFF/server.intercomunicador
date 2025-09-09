@@ -63,19 +63,45 @@ def register():
     password = data.get('password')
     email = data.get('email')
     telegram_id = data.get('telegram_id')
+    uuid = data.get('uuid')
     if not username or not password:
         abort(400, 'username y password requeridos')
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
-        c.execute('INSERT INTO users (username, password, email, telegram_id) VALUES (?, ?, ?, ?)',
-                  (username, password, email, telegram_id))
+        c.execute('ALTER TABLE users ADD COLUMN uuid TEXT')
+    except Exception:
+        pass
+    # Verificar si el nombre ya está ocupado
+    c.execute('SELECT id FROM users WHERE username=?', (username,))
+    if c.fetchone():
+        conn.close()
+        return jsonify({'error': 'El nombre ya ha sido ocupado por otra persona'})
+    try:
+        c.execute('INSERT INTO users (username, password, email, telegram_id, uuid) VALUES (?, ?, ?, ?, ?)',
+                  (username, password, email, telegram_id, uuid))
         conn.commit()
         return jsonify({'status': 'usuario registrado'})
     except sqlite3.IntegrityError:
         return jsonify({'error': 'usuario ya existe'})
     finally:
         conn.close()
+# Endpoint para buscar usuario por nombre
+@app.route('/find_user_by_name', methods=['POST'])
+def find_user_by_name():
+    data = request.json
+    nombre = data.get('nombre')
+    if not nombre:
+        abort(400, 'Nombre requerido')
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT id, username, uuid FROM users WHERE username=?', (nombre,))
+    user = c.fetchone()
+    conn.close()
+    if user:
+        return jsonify({'exists': True, 'nombre': user[1], 'uuid': user[2]})
+    else:
+        return jsonify({'exists': False})
 
 # Login de usuario
 @app.route('/login', methods=['POST'])
@@ -295,7 +321,7 @@ def find_user_by_uuid():
         abort(400, 'UUID requerido')
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('SELECT id, username FROM users WHERE username=? OR telegram_id=?', (uuid, uuid))
+    c.execute('SELECT id, username FROM users WHERE uuid=?', (uuid,))
     user = c.fetchone()
     conn.close()
     if user:
